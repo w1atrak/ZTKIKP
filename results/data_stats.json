@@ -1,0 +1,222 @@
+{
+  "source": "https://archive.ics.uci.edu/static/public/228/sms+spam+collection.zip",
+  "seed": 42,
+  "test_size": 0.2,
+  "raw": {
+    "total": 5574,
+    "ham": 4827,
+    "spam": 747,
+    "spam_ratio": 0.134
+  },
+  "deduplication": {
+    "n_raw": 5574,
+    "n_duplicates_removed": 403,
+    "n_duplicates_removed_by_label": {
+      "ham": 309,
+      "spam": 94
+    },
+    "n_texts_with_conflicting_labels": 0,
+    "n_dedup": 5171
+  },
+  "dedup": {
+    "total": 5171,
+    "ham": 4518,
+    "spam": 653,
+    "spam_ratio": 0.1263
+  },
+  "train": {
+    "total": 4136,
+    "ham": 3614,
+    "spam": 522,
+    "spam_ratio": 0.1262
+  },
+  "test": {
+    "total": 1035,
+    "ham": 904,
+    "spam": 131,
+    "spam_ratio": 0.1266
+  },
+  "majority_baseline_accuracy_test": 0.8734,
+  "message_length": {
+    "ham": {
+      "chars_mean": 70.89,
+      "chars_median": 53.0,
+      "chars_max": 910,
+      "words_mean": 14.23,
+      "words_median": 11.0
+    },
+    "spam": {
+      "chars_mean": 137.71,
+      "chars_median": 148.0,
+      "chars_max": 223,
+      "words_mean": 23.74,
+      "words_median": 25.0
+    }
+  },
+  "top_words": {
+    "ham": [
+      [
+        "know",
+        183
+      ],
+      [
+        "like",
+        178
+      ],
+      [
+        "got",
+        174
+      ],
+      [
+        "good",
+        173
+      ],
+      [
+        "come",
+        165
+      ],
+      [
+        "call",
+        152
+      ],
+      [
+        "day",
+        147
+      ],
+      [
+        "time",
+        143
+      ],
+      [
+        "love",
+        140
+      ],
+      [
+        "going",
+        137
+      ],
+      [
+        "lor",
+        135
+      ],
+      [
+        "want",
+        133
+      ],
+      [
+        "one",
+        127
+      ],
+      [
+        "home",
+        126
+      ],
+      [
+        "need",
+        126
+      ],
+      [
+        "still",
+        118
+      ],
+      [
+        "about",
+        114
+      ],
+      [
+        "dont",
+        108
+      ],
+      [
+        "only",
+        106
+      ],
+      [
+        "see",
+        106
+      ]
+    ],
+    "spam": [
+      [
+        "call",
+        252
+      ],
+      [
+        "free",
+        156
+      ],
+      [
+        "txt",
+        110
+      ],
+      [
+        "text",
+        92
+      ],
+      [
+        "mobile",
+        90
+      ],
+      [
+        "stop",
+        89
+      ],
+      [
+        "reply",
+        82
+      ],
+      [
+        "claim",
+        72
+      ],
+      [
+        "www",
+        70
+      ],
+      [
+        "prize",
+        65
+      ],
+      [
+        "cash",
+        54
+      ],
+      [
+        "only",
+        53
+      ],
+      [
+        "new",
+        52
+      ],
+      [
+        "send",
+        51
+      ],
+      [
+        "win",
+        49
+      ],
+      [
+        "won",
+        49
+      ],
+      [
+        "com",
+        44
+      ],
+      [
+        "urgent",
+        44
+      ],
+      [
+        "nokia",
+        44
+      ],
+      [
+        "msg",
+        42
+      ]
+    ]
+  }
+}
