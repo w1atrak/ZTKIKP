@@ -1,0 +1,21 @@
+[project]
+name = "ppspam"
+version = "0.1.0"
+description = "Privacy-preserving spam detection (Paillier + Naive Bayes)"
+readme = "README.md"
+requires-python = ">=3.11"
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

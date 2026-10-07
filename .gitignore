@@ -1,0 +1,36 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Data (raw SMS collection — download via scripts/download_data.py)
+data/raw/
+
+# Artifacts and large results
+artifacts/*.joblib
+artifacts/*.pkl
+results/*.csv
+results/*.png
+results/*.json
+!results/data_stats.json
+!results/.gitkeep
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
