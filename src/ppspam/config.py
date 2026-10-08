@@ -12,6 +12,15 @@ DATA_PROCESSED = REPO_ROOT / "data" / "processed"
 ARTIFACTS_DIR = REPO_ROOT / "artifacts"
 RESULTS_DIR = REPO_ROOT / "results"
 
+# TF-IDF (norm is always "l2"; see ppspam.features.make_vectorizer)
+TFIDF_PARAMS: dict = {
+    "ngram_range": (1, 1),
+    "min_df": 1,
+    "max_df": 1.0,
+    "max_features": None,
+    "sublinear_tf": True,
+}
+
 # ML / quantization (defaults; refined in later phases)
 VOCAB_SIZE_CANDIDATES: tuple[int, ...] = (500, 1000, 2000)
 FEATURE_DIM: int = 1000  # chosen after experiment E1; placeholder for phase 0
