@@ -22,8 +22,13 @@ from sklearn.pipeline import Pipeline
 from ppspam import config, features
 
 MODEL_JOBLIB = config.ARTIFACTS_DIR / "model.joblib"
+SERVER_WEIGHTS_JSON = config.ARTIFACTS_DIR / "server_weights.json"
 PLAIN_METRICS_JSON = config.RESULTS_DIR / "plain_metrics.json"
 CV_RESULTS_CSV = config.RESULTS_DIR / "cv_results.csv"
+LINEAR_STATS_JSON = config.RESULTS_DIR / "linear_stats.json"
+
+SPAM = 1
+HAM = 0
 
 PARAM_GRID: dict = {
     "tfidf__ngram_range": [(1, 1), (1, 2)],
@@ -104,3 +109,65 @@ def evaluate_baselines(train_texts, y_train, test_texts, y_test) -> dict:
         model = train(train_texts, y_train, classifier=clone(clf))
         out[name] = evaluate(model, test_texts, y_test)
     return out
+
+
+def featurize(model: Pipeline, texts):
+    """Feature vectors exactly as the classifier sees them (TF-IDF + selection)."""
+    return model[:-1].transform(texts)
+
+
+def linear_params(model: Pipeline) -> tuple[np.ndarray, float]:
+    """Single difference vector of the NB log-model: ``s(x) = b + x · w`` (D2).
+
+    ``w = log P(t|spam) - log P(t|ham)``, ``b = log P(spam) - log P(ham)``.
+    """
+    nb = model.named_steps["nb"]
+    classes = list(nb.classes_)
+    spam, ham = classes.index(SPAM), classes.index(HAM)
+    w = nb.feature_log_prob_[spam] - nb.feature_log_prob_[ham]
+    b = float(nb.class_log_prior_[spam] - nb.class_log_prior_[ham])
+    return w, b
+
+
+def linear_score(X, w: np.ndarray, b: float) -> np.ndarray:
+    return np.asarray(X @ w).ravel() + b
+
+
+def predict_linear(scores: np.ndarray) -> np.ndarray:
+    """``spam ⇔ s > 0``; a tie goes to ham like sklearn's argmax over [ham, spam]."""
+    return np.where(scores > 0, SPAM, HAM)
+
+
+def server_weights(model: Pipeline) -> dict:
+    w, b = linear_params(model)
+    return {"w": w.tolist(), "b": b, "d": len(w), "spam_iff": "s > 0"}
+
+
+def _quantiles(values: np.ndarray) -> dict:
+    qs = (0.0, 0.01, 0.05, 0.25, 0.5, 0.75, 0.95, 0.99, 1.0)
+    return {f"q{int(q * 100):02d}": float(np.quantile(values, q)) for q in qs}
+
+
+def linear_stats(model: Pipeline, texts) -> dict:
+    """Weight distribution (to pick ``S_w``) and ``|s|`` near the decision boundary."""
+    w, b = linear_params(model)
+    s = linear_score(featurize(model, texts), w, b)
+    abs_s = np.abs(s)
+    return {
+        "d": len(w),
+        "b": b,
+        "w": {
+            "min": float(w.min()),
+            "max": float(w.max()),
+            "mean": float(w.mean()),
+            "std": float(w.std()),
+            "abs_min": float(np.abs(w).min()),
+            "n_positive": int((w > 0).sum()),
+            **_quantiles(w),
+        },
+        "abs_score": {
+            "n": len(s),
+            **_quantiles(abs_s),
+            **{f"n_below_{t:g}": int((abs_s < t).sum()) for t in (1e-3, 1e-2, 0.1, 1)},
+        },
+    }
