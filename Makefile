@@ -1,4 +1,4 @@
-.PHONY: venv install test fmt lint verify-gmpy2 data tune train bench demo
+.PHONY: venv install test fmt lint verify-gmpy2 data tune select-features train bench demo
 
 VENV := .venv
 PY := $(VENV)/bin/python
@@ -31,6 +31,9 @@ data:
 
 tune:
 	$(PY) scripts/train.py --tune
+
+select-features:
+	$(PY) scripts/select_features.py
 
 train:
 	$(PY) scripts/train.py

@@ -1,8 +1,9 @@
 """Preprocessing and public-model export/import (phase A2)."""
 
 import numpy as np
+import pytest
 
-from ppspam import features
+from ppspam import data, features, model
 
 TRAIN = [
     "WINNER!! Claim your £900 prize: call 09061701461 now",
@@ -41,7 +42,7 @@ def _round_trip(vec, selected=None, tmp_path=None):
 
 
 def test_export_import_identical_vectors(tmp_path):
-    vec = features.make_vectorizer(ngram_range=(1, 2)).fit(TRAIN)
+    vec = features.make_vectorizer(ngram_range=(1, 2), min_df=1).fit(TRAIN)
     client, public = _round_trip(vec, tmp_path=tmp_path)
     texts = TRAIN + UNSEEN
     assert public["d"] == len(vec.vocabulary_)
@@ -51,7 +52,7 @@ def test_export_import_identical_vectors(tmp_path):
 
 
 def test_export_import_with_selection():
-    vec = features.make_vectorizer().fit(TRAIN)
+    vec = features.make_vectorizer(min_df=1).fit(TRAIN)
     selected = np.array([0, 3, 5, 7])
     client, public = _round_trip(vec, selected=selected)
     texts = TRAIN + UNSEEN
@@ -59,3 +60,22 @@ def test_export_import_with_selection():
     out = client.transform(texts)
     assert public["d"] == out.shape[1] == 4
     assert np.array_equal(out.toarray(), expected)
+
+
+@pytest.mark.parametrize("method", features.SELECTION_METHODS)
+def test_public_featurizer_matches_trained_pipeline(method):
+    if not data.TEST_CSV.exists():
+        pytest.skip("run scripts/download_data.py")
+    train, test = data.load_split()
+    clf = model.train(
+        train["text"], model.labels_to_y(train["label"]), method=method, k=200
+    )
+    public = features.export_public_model(
+        clf.named_steps["tfidf"], selected=model.selected_columns(clf), path=None
+    )
+    client = features.PublicFeaturizer(public)
+    texts = test["text"][:200]
+    assert public["d"] == 200
+    assert np.array_equal(
+        client.transform(texts).toarray(), model.featurize(clf, texts).toarray()
+    )

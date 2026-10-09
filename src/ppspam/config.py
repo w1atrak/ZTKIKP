@@ -15,17 +15,19 @@ RESULTS_DIR = REPO_ROOT / "results"
 # TF-IDF (norm is always "l2"; see ppspam.features.make_vectorizer) and NB
 # smoothing, chosen by `scripts/train.py --tune` (5-fold CV on train, refit on F1)
 TFIDF_PARAMS: dict = {
-    "ngram_range": (1, 2),
-    "min_df": 1,
+    "ngram_range": (1, 1),
+    "min_df": 2,
     "max_df": 1.0,
     "max_features": None,
     "sublinear_tf": False,
 }
-NB_ALPHA: float = 0.03
+NB_ALPHA: float = 0.1
 
 # ML / quantization (defaults; refined in later phases)
 VOCAB_SIZE_CANDIDATES: tuple[int, ...] = (500, 1000, 2000)
-FEATURE_DIM: int = 1000  # chosen after experiment E1; placeholder for phase 0
+# d = length of the encrypted vector; None keeps the full vocabulary
+FEATURE_SELECTION: str = "max_features"  # see ppspam.features.SELECTION_METHODS
+FEATURE_DIM: int | None = 1000  # chosen in scripts/select_features.py (A5)
 SCALE_X: float = 1e4  # S_x
 SCALE_W: float = 1e6  # S_w
 

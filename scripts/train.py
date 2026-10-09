@@ -42,7 +42,9 @@ def main() -> None:
     clf = model.train(texts, y)
     config.ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
     joblib.dump(clf, model.MODEL_JOBLIB)
-    public = features.export_public_model(clf.named_steps["tfidf"])
+    public = features.export_public_model(
+        clf.named_steps["tfidf"], selected=model.selected_columns(clf)
+    )
     model.SERVER_WEIGHTS_JSON.write_text(json.dumps(model.server_weights(clf)))
     print(f"trained on {len(texts)} SMS, d = {public['d']}")
 

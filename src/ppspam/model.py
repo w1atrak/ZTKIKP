@@ -43,15 +43,28 @@ def labels_to_y(labels: pd.Series) -> np.ndarray:
     return (labels == "spam").to_numpy(dtype=np.int64)
 
 
-def build_pipeline(classifier=None, selector="passthrough", **tfidf_params) -> Pipeline:
+def build_pipeline(
+    classifier=None,
+    method: str = config.FEATURE_SELECTION,
+    k: int | None = config.FEATURE_DIM,
+    **tfidf_params,
+) -> Pipeline:
+    """TF-IDF → feature selection to ``k`` columns → classifier (default NB)."""
     clf = MultinomialNB(alpha=config.NB_ALPHA) if classifier is None else classifier
+    selector, overrides = features.make_selection(method, k)
     return Pipeline(
         [
-            ("tfidf", features.make_vectorizer(**tfidf_params)),
+            ("tfidf", features.make_vectorizer(**{**overrides, **tfidf_params})),
             ("select", selector),
             ("nb", clf),
         ]
     )
+
+
+def selected_columns(model: Pipeline) -> np.ndarray | None:
+    """Indices of TF-IDF columns fed to the classifier (``None`` = all)."""
+    selector = model.named_steps["select"]
+    return None if selector == "passthrough" else selector.get_support(indices=True)
 
 
 def cv_splitter() -> StratifiedKFold:

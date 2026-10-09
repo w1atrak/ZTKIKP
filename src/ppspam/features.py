@@ -8,7 +8,10 @@ from pathlib import Path
 
 import numpy as np
 from scipy import sparse
+from sklearn.base import BaseEstimator
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_selection import SelectKBest, SelectorMixin, chi2
+from sklearn.naive_bayes import MultinomialNB
 
 from ppspam import config
 
@@ -43,6 +46,46 @@ def make_vectorizer(**params) -> TfidfVectorizer:
     """TF-IDF with the project preprocessing; ``params`` override config defaults."""
     kwargs = {**config.TFIDF_PARAMS, **params}
     return TfidfVectorizer(preprocessor=preprocess, norm="l2", **kwargs)
+
+
+class TopWeightSelector(SelectorMixin, BaseEstimator):
+    """Keep the ``k`` features with the largest NB log-ratio ``|w_i|``."""
+
+    def __init__(self, k: int = 1000, alpha: float = 1.0):
+        self.k = k
+        self.alpha = alpha
+
+    def fit(self, X, y):
+        nb = MultinomialNB(alpha=self.alpha).fit(X, y)
+        w = nb.feature_log_prob_[1] - nb.feature_log_prob_[0]
+        top = np.argsort(-np.abs(w), kind="stable")[: self.k]
+        self.support_ = np.zeros(X.shape[1], dtype=bool)
+        self.support_[top] = True
+        return self
+
+    def _get_support_mask(self):
+        return self.support_
+
+
+SELECTION_METHODS = ("max_features", "chi2", "top_weight")
+
+
+def make_selection(method: str, k: int | None) -> tuple[object, dict]:
+    """Selector step and TF-IDF overrides limiting the feature vector to ``k``.
+
+    ``k=None`` keeps the full vocabulary. ``max_features`` truncates the vocabulary
+    by term frequency (so the L2 norm is over ``k`` terms); ``chi2`` and
+    ``top_weight`` select columns of the full TF-IDF vector.
+    """
+    if method not in SELECTION_METHODS:
+        raise ValueError(f"unknown feature selection method: {method}")
+    if k is None:
+        return "passthrough", {}
+    if method == "max_features":
+        return "passthrough", {"max_features": k}
+    if method == "chi2":
+        return SelectKBest(chi2, k=k), {}
+    return TopWeightSelector(k=k, alpha=config.NB_ALPHA), {}
 
 
 def export_public_model(
