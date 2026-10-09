@@ -12,14 +12,16 @@ DATA_PROCESSED = REPO_ROOT / "data" / "processed"
 ARTIFACTS_DIR = REPO_ROOT / "artifacts"
 RESULTS_DIR = REPO_ROOT / "results"
 
-# TF-IDF (norm is always "l2"; see ppspam.features.make_vectorizer)
+# TF-IDF (norm is always "l2"; see ppspam.features.make_vectorizer) and NB
+# smoothing, chosen by `scripts/train.py --tune` (5-fold CV on train, refit on F1)
 TFIDF_PARAMS: dict = {
-    "ngram_range": (1, 1),
+    "ngram_range": (1, 2),
     "min_df": 1,
     "max_df": 1.0,
     "max_features": None,
-    "sublinear_tf": True,
+    "sublinear_tf": False,
 }
+NB_ALPHA: float = 0.03
 
 # ML / quantization (defaults; refined in later phases)
 VOCAB_SIZE_CANDIDATES: tuple[int, ...] = (500, 1000, 2000)

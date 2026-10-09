@@ -20,6 +20,7 @@ data/raw/
 # Artifacts and large results
 artifacts/*.joblib
 artifacts/*.pkl
+artifacts/*.json
 results/*.csv
 results/*.png
 results/*.json

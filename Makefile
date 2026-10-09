@@ -1,4 +1,4 @@
-.PHONY: venv install test fmt lint verify-gmpy2 data train bench demo
+.PHONY: venv install test fmt lint verify-gmpy2 data tune train bench demo
 
 VENV := .venv
 PY := $(VENV)/bin/python
@@ -29,8 +29,12 @@ verify-gmpy2:
 data:
 	$(PY) scripts/download_data.py
 
+tune:
+	$(PY) scripts/train.py --tune
+
 train:
-	@echo "Not implemented yet — see scripts/train.py (phase A3)"
+	$(PY) scripts/train.py
+	$(PY) scripts/eval_plain.py
 
 bench:
 	@echo "Not implemented yet — see scripts/bench.py"
