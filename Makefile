@@ -1,4 +1,4 @@
-.PHONY: venv install test fmt lint verify-gmpy2 data tune select-features train quantize bench-primitives bench demo
+.PHONY: venv install test fmt lint verify-gmpy2 data tune select-features train quantize bench-primitives budget bench demo
 
 VENV := .venv
 PY := $(VENV)/bin/python
@@ -44,6 +44,9 @@ quantize:
 
 bench-primitives:
 	$(PY) scripts/bench_primitives.py
+
+budget:
+	$(PY) scripts/budget.py
 
 bench:
 	@echo "Not implemented yet — see scripts/bench.py"
