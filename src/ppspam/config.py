@@ -28,8 +28,8 @@ VOCAB_SIZE_CANDIDATES: tuple[int, ...] = (500, 1000, 2000)
 # d = length of the encrypted vector; None keeps the full vocabulary
 FEATURE_SELECTION: str = "max_features"  # see ppspam.features.SELECTION_METHODS
 FEATURE_DIM: int | None = 1000  # chosen in scripts/select_features.py (A5)
-SCALE_X: float = 1e4  # S_x
-SCALE_W: float = 1e6  # S_w
+SCALE_X: float = 1e3  # S_x — smallest pair with 0 sign mismatches (A6)
+SCALE_W: float = 1e2  # S_w
 
 # Paillier key sizes (bits)
 KEY_SIZE_DEV: int = 1024

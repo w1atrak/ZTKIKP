@@ -1,4 +1,4 @@
-.PHONY: venv install test fmt lint verify-gmpy2 data tune select-features train bench demo
+.PHONY: venv install test fmt lint verify-gmpy2 data tune select-features train quantize bench demo
 
 VENV := .venv
 PY := $(VENV)/bin/python
@@ -38,6 +38,9 @@ select-features:
 train:
 	$(PY) scripts/train.py
 	$(PY) scripts/eval_plain.py
+
+quantize:
+	$(PY) scripts/quantize.py
 
 bench:
 	@echo "Not implemented yet — see scripts/bench.py"

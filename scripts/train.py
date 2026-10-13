@@ -12,7 +12,7 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 import joblib  # noqa: E402
 import pandas as pd  # noqa: E402
 
-from ppspam import config, data, features, model  # noqa: E402
+from ppspam import config, data, features, model, quantize  # noqa: E402
 
 
 def run_tuning(texts, y) -> None:
@@ -43,7 +43,9 @@ def main() -> None:
     config.ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
     joblib.dump(clf, model.MODEL_JOBLIB)
     public = features.export_public_model(
-        clf.named_steps["tfidf"], selected=model.selected_columns(clf)
+        clf.named_steps["tfidf"],
+        selected=model.selected_columns(clf),
+        extra={"S_x": config.SCALE_X, "S_w": config.SCALE_W},
     )
     model.SERVER_WEIGHTS_JSON.write_text(json.dumps(model.server_weights(clf)))
     print(f"trained on {len(texts)} SMS, d = {public['d']}")
@@ -71,6 +73,29 @@ def main() -> None:
     )
     if n_diff:
         raise SystemExit("linear form disagrees with sklearn predictions")
+
+    X_test = model.featurize(clf, test["text"])
+    X_q = quantize.quantize_features(X_test, config.SCALE_X)
+    w_q, b_q_prime = quantize.quantize_weights(w, b, config.SCALE_X, config.SCALE_W)
+    s_q = quantize.quantized_score(X_q, w_q, b_q_prime)
+    peak = quantize.assert_score_in_range(s_q)
+    n_q = quantize.n_sign_mismatches(scores, s_q)
+    quantize.write_server_weights_q(
+        quantize.server_weights_q(
+            w,
+            b,
+            config.SCALE_X,
+            config.SCALE_W,
+            extra={"max_abs_s_q_test": peak, "n_mismatch_test": n_q},
+        )
+    )
+    print(
+        f"quantized S_x={config.SCALE_X:g} S_w={config.SCALE_W:g}: "
+        f"{n_q} sign mismatches on test, max |s_q|={peak}"
+    )
+    print(f"written: {quantize.SERVER_WEIGHTS_Q_JSON}")
+    if n_q:
+        raise SystemExit("quantized scores disagree with the float linear form")
 
 
 if __name__ == "__main__":
