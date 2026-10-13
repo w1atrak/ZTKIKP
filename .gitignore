@@ -25,6 +25,7 @@ results/*.csv
 results/*.png
 results/*.json
 !results/data_stats.json
+!results/bench_primitives.csv
 !results/.gitkeep
 
 # IDE
