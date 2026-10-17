@@ -36,5 +36,8 @@ KEY_SIZE_DEV: int = 1024
 KEY_SIZE_PROD: int = 2048
 KEY_SIZE_BENCH: int = 3072
 
+# Bumped when the published featurizer and the server weights change together.
+MODEL_VERSION: str = "1"
+
 # Train/test split
 TEST_SIZE: float = 0.2
