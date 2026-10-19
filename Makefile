@@ -1,8 +1,10 @@
-.PHONY: venv install test fmt lint verify-gmpy2 data tune select-features train quantize bench-primitives budget bench demo
+.PHONY: venv install test fmt lint verify-gmpy2 data tune select-features train quantize bench-primitives budget bench serve demo eval-encrypted
 
 VENV := .venv
 PY := $(VENV)/bin/python
 PIP := $(VENV)/bin/pip
+ARGS ?=
+export PYTHONPATH := src
 
 venv:
 	python3 -m venv $(VENV)
@@ -51,5 +53,11 @@ budget:
 bench:
 	@echo "Not implemented yet — see scripts/bench.py"
 
+serve:
+	$(PY) -m ppspam.server
+
 demo:
-	@echo "Not implemented yet — see scripts/demo.py"
+	$(PY) scripts/demo.py $(ARGS)
+
+eval-encrypted:
+	$(PY) scripts/eval_encrypted.py $(ARGS)

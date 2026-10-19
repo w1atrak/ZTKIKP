@@ -44,3 +44,22 @@ Pakiet źródłowy: `src/ppspam/` (`config.py` — `SEED=42`, ścieżki, paramet
 Dane: `data/raw/` (pobierane skryptem), `data/processed/` (train/test).  
 Artefakty modelu: `artifacts/`, wyniki pomiarów: `results/`.
 
+## Demo klient–serwer (B5)
+
+Najpierw `make train` (artefakty w `artifacts/`). Potem lokalnie w jednym procesie:
+
+```bash
+make demo
+# albo jedna wiadomość:
+make demo ARGS='--text "WINNER!! claim your prize now"'
+```
+
+Albo dwa terminale (API + klient sieciowy):
+
+```bash
+make serve                                          # http://127.0.0.1:8000
+make demo ARGS='--url http://127.0.0.1:8000'
+```
+
+Endpointy: `GET /public-model`, `POST /score`, `GET /health`. Domyślny klucz w demo to 1024 bit (szybko); wyniki do raportu liczy `make eval-encrypted` na 2048.
+
