@@ -26,6 +26,8 @@ results/*.png
 results/*.json
 !results/data_stats.json
 !results/bench_primitives.csv
+!results/encrypted_eval.csv
+!results/encrypted_metrics.json
 !results/.gitkeep
 
 # IDE
@@ -36,3 +38,4 @@ results/*.json
 # OS
 .DS_Store
 Thumbs.db
+results/*.log
