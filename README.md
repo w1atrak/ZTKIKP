@@ -63,3 +63,12 @@ make demo ARGS='--url http://127.0.0.1:8000'
 
 Endpointy: `GET /public-model`, `POST /score`, `GET /health`. Domyślny klucz w demo to 1024 bit (szybko); wyniki do raportu liczy `make eval-encrypted` na 2048.
 
+## Ewaluacja zaszyfrowana (A7)
+
+```bash
+make eval-encrypted                 # pełny test, klucz 2048, wiele procesów
+make eval-encrypted ARGS='--limit 10 --key-size 1024'   # szybki smoke
+```
+
+Wyniki: `results/encrypted_eval.csv`, `results/encrypted_metrics.json` (K2–K4).
+
