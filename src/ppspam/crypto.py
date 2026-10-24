@@ -8,9 +8,11 @@ from __future__ import annotations
 
 import base64
 import json
+import random
 from collections.abc import Sequence
 
 from phe import paillier
+from phe.util import mulmod, powmod
 
 from ppspam import config
 
@@ -22,17 +24,80 @@ def generate_keypair(n_length: int = config.KEY_SIZE_DEV):
     return paillier.generate_paillier_keypair(n_length=n_length)
 
 
-def encrypt_vector(public_key, x_q: Sequence[int]) -> list:
-    """Encrypt each integer coordinate. Zeros are encrypted too (D4)."""
+class ObfuscatorPool:
+    """Offline ``r^n mod n²`` values for one public key (B6).
+
+    ``r`` does not depend on the message, so the expensive power can be done
+    before the SMS exists. :meth:`take` removes the value: no ``r`` is used twice.
+    """
+
+    def __init__(self, public_key, size: int = 0):
+        self.public_key = public_key
+        self._values: list[int] = []
+        if size:
+            self.fill(size)
+
+    def __len__(self) -> int:
+        return len(self._values)
+
+    def fill(self, count: int) -> None:
+        self._values.extend(make_obfuscators(self.public_key.n, count))
+
+    def take(self) -> int:
+        if not self._values:
+            raise RuntimeError("obfuscator pool is empty; refill it before encrypting")
+        return self._values.pop()
+
+
+def make_obfuscators(n: int, count: int) -> list[int]:
+    """``count`` fresh ``r^n mod n²`` with ``r`` from ``SystemRandom``."""
+    rng = random.SystemRandom()
+    nsquare = n * n
+    return [powmod(rng.randrange(1, n), n, nsquare) for _ in range(count)]
+
+
+def encrypt_vector(
+    public_key, x_q: Sequence[int], pool: ObfuscatorPool | None = None
+) -> list:
+    """Encrypt each integer coordinate. Zeros are encrypted too (D4).
+
+    With ``pool`` the online step is ``(1 + n·m) · r^n mod n²`` with a
+    precomputed ``r^n``; otherwise ``phe`` draws and raises ``r`` per value.
+    """
+    _check_ints(x_q)
+    if pool is not None:
+        if pool.public_key.n != public_key.n:
+            raise ValueError("obfuscator pool belongs to a different public key")
+        if len(pool) < len(x_q):
+            raise RuntimeError(
+                f"obfuscator pool has {len(pool)} values, need {len(x_q)}"
+            )
     encrypted = []
     for value in x_q:
-        if isinstance(value, bool) or not isinstance(value, int):
-            raise TypeError(f"expected Python int, got {type(value).__name__}")
-        enc = public_key.encrypt(int(value))
+        if pool is None:
+            enc = public_key.encrypt(int(value))
+        else:
+            nude = public_key.encrypt(int(value), r_value=1)
+            nude_ct = nude.ciphertext(be_secure=False)
+            ct = mulmod(nude_ct, pool.take(), public_key.nsquare)
+            enc = _obfuscated(public_key, ct, nude.exponent)
         if enc.exponent != 0:
             raise ValueError("integer Paillier ciphertext must have exponent 0 (D3)")
         encrypted.append(enc)
     return encrypted
+
+
+def _check_ints(values: Sequence[int]) -> None:
+    for value in values:
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise TypeError(f"expected Python int, got {type(value).__name__}")
+
+
+def _obfuscated(public_key, ciphertext: int, exponent: int) -> paillier.EncryptedNumber:
+    enc = paillier.EncryptedNumber(public_key, ciphertext, exponent)
+    # phe has no public setter; without it ciphertext() would obfuscate again.
+    enc._EncryptedNumber__is_obfuscated = True
+    return enc
 
 
 def decrypt_scalar(private_key, encrypted) -> int:
