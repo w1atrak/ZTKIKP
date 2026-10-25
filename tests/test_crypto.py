@@ -55,7 +55,8 @@ def test_decimal_and_compact_round_trip(keypair):
 def test_compact_json_is_smaller(keypair):
     public_key, _ = keypair
     sizes = crypto.encoding_sizes(public_key.encrypt(42))
-    assert sizes["raw_bytes"] == public_key.n.bit_length() * 2 // 8
+    # A ciphertext is any value below n², so its top byte can be zero.
+    assert sizes["raw_bytes"] <= (public_key.nsquare.bit_length() + 7) // 8
     assert sizes["b64_json"] < sizes["decimal_json"]
 
 
