@@ -10,6 +10,7 @@ import base64
 import json
 import random
 from collections.abc import Sequence
+from concurrent.futures import Executor
 
 from phe import paillier
 from phe.util import mulmod, powmod
@@ -40,8 +41,18 @@ class ObfuscatorPool:
     def __len__(self) -> int:
         return len(self._values)
 
-    def fill(self, count: int) -> None:
-        self._values.extend(make_obfuscators(self.public_key.n, count))
+    def fill(
+        self, count: int, executor: Executor | None = None, chunks: int = 1
+    ) -> None:
+        if executor is None:
+            self._values.extend(make_obfuscators(self.public_key.n, count))
+            return
+        sizes = [len(part) for part in split_chunks([None] * count, chunks)]
+        futures = [
+            executor.submit(make_obfuscators, self.public_key.n, size) for size in sizes
+        ]
+        for future in futures:
+            self._values.extend(future.result())
 
     def take(self) -> int:
         if not self._values:
@@ -85,6 +96,45 @@ def encrypt_vector(
             raise ValueError("integer Paillier ciphertext must have exponent 0 (D3)")
         encrypted.append(enc)
     return encrypted
+
+
+def encrypt_vector_parallel(
+    public_key, x_q: Sequence[int], executor: Executor, chunks: int
+) -> list:
+    """:func:`encrypt_vector` split into ``chunks`` contiguous parts on ``executor``.
+
+    Workers only get ``n`` and plaintext integers; they return raw ciphertexts.
+    """
+    _check_ints(x_q)
+    futures = [
+        executor.submit(_encrypt_chunk, public_key.n, part)
+        for part in split_chunks(list(x_q), chunks)
+    ]
+    encrypted = []
+    for future in futures:
+        encrypted.extend(_obfuscated(public_key, ct, 0) for ct in future.result())
+    return encrypted
+
+
+def split_chunks(values: list, chunks: int) -> list[list]:
+    """Contiguous, near-equal, non-empty parts (order preserved)."""
+    if chunks < 1:
+        raise ValueError("chunks must be >= 1")
+    size, extra = divmod(len(values), chunks)
+    parts, start = [], 0
+    for i in range(chunks):
+        stop = start + size + (1 if i < extra else 0)
+        if stop > start:
+            parts.append(values[start:stop])
+        start = stop
+    return parts
+
+
+def _encrypt_chunk(n: int, values: list[int]) -> list[int]:
+    public_key = paillier.PaillierPublicKey(n=n)
+    return [
+        enc.ciphertext(be_secure=False) for enc in encrypt_vector(public_key, values)
+    ]
 
 
 def _check_ints(values: Sequence[int]) -> None:

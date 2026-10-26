@@ -1,5 +1,7 @@
 """Paillier vectors, homomorphisms and serialization (phase B2)."""
 
+from concurrent.futures import ProcessPoolExecutor
+
 import pytest
 
 from ppspam import crypto
@@ -115,6 +117,29 @@ def test_pool_refuses_short_or_foreign_pool(keypair):
         crypto.encrypt_vector(
             public_key, [1], pool=crypto.ObfuscatorPool(other, size=1)
         )
+
+
+def test_split_chunks_preserves_order():
+    assert crypto.split_chunks(list(range(7)), 3) == [[0, 1, 2], [3, 4], [5, 6]]
+    assert crypto.split_chunks([1, 2], 5) == [[1], [2]]
+    with pytest.raises(ValueError):
+        crypto.split_chunks([1], 0)
+
+
+def test_parallel_encryption_and_pool_fill(keypair):
+    public_key, private_key = keypair
+    with ProcessPoolExecutor(max_workers=2) as executor:
+        encrypted = crypto.encrypt_vector_parallel(public_key, _X, executor, chunks=3)
+        pool = crypto.ObfuscatorPool(public_key)
+        pool.fill(5, executor=executor, chunks=2)
+    assert [crypto.decrypt_scalar(private_key, c) for c in encrypted] == _X
+    assert all(c.exponent == 0 for c in encrypted)
+    assert [c.ciphertext() for c in encrypted] == [
+        c.ciphertext(be_secure=False) for c in encrypted
+    ]
+    assert len(pool) == 5
+    pooled = crypto.encrypt_vector(public_key, [7] * 5, pool=pool)
+    assert [crypto.decrypt_scalar(private_key, c) for c in pooled] == [7] * 5
 
 
 def test_rejects_ciphertext_outside_modulus(keypair):
