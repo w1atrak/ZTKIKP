@@ -74,9 +74,31 @@ def test_score_round_trip(client, tiny_artifacts):
             public_key, (payload["result"], payload["exponent"])
         ),
     )
-    assert got == quantize.quantized_score(
-        [x_q], weights["w_q"], weights["b_q_prime"]
-    )[0]
+    assert (
+        got == quantize.quantized_score([x_q], weights["w_q"], weights["b_q_prime"])[0]
+    )
+
+
+def test_score_response_is_freshly_obfuscated(tiny_artifacts):
+    weights_path, _, _ = tiny_artifacts
+    server = Server(weights_path=weights_path)
+    public_key, private_key = crypto.generate_keypair(1024)
+    encrypted = crypto.encrypt_vector(public_key, [1, 2, 3])
+    body = protocol.score_request(
+        str(public_key.n),
+        [crypto.ciphertext_to_pair(c)[0] for c in encrypted],
+        server.model_version,
+    )
+    first = server.score_protocol(body)["result"]
+    second = server.score_protocol(body)["result"]
+    assert first != second
+    scores = {
+        crypto.decrypt_scalar(
+            private_key, crypto.ciphertext_from_pair(public_key, (ct, 0))
+        )
+        for ct in (first, second)
+    }
+    assert scores == {4 + 2 - 6}
 
 
 def test_score_rejects_bad_version_and_length(client):

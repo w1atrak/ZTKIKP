@@ -43,7 +43,8 @@ class Server:
     def score(self, public_key, enc_vector) -> EncryptedNumber:
         """``Enc(b_q') + Σ enc_i * w_q[i]``. A zero weight skips the multiplication."""
         self._validate(public_key, enc_vector)
-        acc = public_key.encrypt(self.b_q_prime)
+        # Unobfuscated on purpose: ciphertext_to_pair obfuscates the final sum.
+        acc = public_key.encrypt(self.b_q_prime, r_value=1)
         for cipher, weight in zip(enc_vector, self.w_q, strict=True):
             if weight == 0:
                 continue
