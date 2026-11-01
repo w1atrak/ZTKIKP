@@ -6,11 +6,17 @@ The private key is not a field of any message.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import math
 
 from ppspam import config, crypto
 
-PROTOCOL_VERSION = 1
+# 2: optional "encoding": "b64" on score requests (B6).
+PROTOCOL_VERSION = 2
+
+# "dec": decimal strings; "b64": fixed-width big-endian bytes of each ciphertext.
+WIRE_ENCODINGS = ("dec", "b64")
 
 # Decimal JSON of d ciphertexts, each < n². At d=2000 and a 2048-bit key that
 # is about 2.5 MB; 8 MiB still covers a 3072-bit key at the same d.
@@ -58,37 +64,84 @@ def public_model_message(public: dict, model_version: str | None = None) -> dict
     return message
 
 
-def score_request(n: str, ciphertexts: list[str], model_version: str) -> dict:
-    """``POST /score`` body. Every ciphertext is an integer plaintext (exponent 0)."""
+def score_request(
+    n: str,
+    ciphertexts: list[str] | list[int],
+    model_version: str,
+    encoding: str = "dec",
+) -> dict:
+    """``POST /score`` body. Every ciphertext is an integer plaintext (exponent 0).
+
+    ``ciphertexts`` are ints or decimal strings; ``encoding`` picks the wire form.
+    """
+    if encoding not in WIRE_ENCODINGS:
+        raise ValueError(f"encoding must be one of {WIRE_ENCODINGS}")
+    width = ciphertext_width(int(n))
     body = {
         "n": str(n),
-        "ciphertexts": [str(ct) for ct in ciphertexts],
+        "ciphertexts": [
+            encode_ciphertext(int(ct), encoding, width) for ct in ciphertexts
+        ],
         "model_version": str(model_version),
     }
+    if encoding != "dec":
+        body["encoding"] = encoding
     parse_score_request(body)
     return body
 
 
-def parse_score_request(body: dict) -> tuple[str, list[str], str]:
-    """Return ``(n, ciphertexts, model_version)`` or raise :class:`ProtocolError`."""
+def parse_score_request(body: dict) -> tuple[str, list[int], str]:
+    """Return ``(n, ciphertexts, model_version)`` or raise :class:`ProtocolError`.
+
+    Ciphertexts come back as ints whatever the wire ``encoding`` was.
+    """
     crypto.assert_public_payload(body)
-    if set(body) != {"n", "ciphertexts", "model_version"}:
-        raise ProtocolError("score request must be {n, ciphertexts, model_version}")
-    ciphertexts = body["ciphertexts"]
-    if not isinstance(ciphertexts, list) or not ciphertexts:
-        raise ProtocolError("ciphertexts must be a non-empty list")
-    parsed: list[str] = []
-    for ct in ciphertexts:
-        if isinstance(ct, bool) or not isinstance(ct, str) or not ct.isdecimal():
-            raise ProtocolError("each ciphertext must be a decimal string")
-        parsed.append(ct)
+    if set(body) - {"encoding"} != {"n", "ciphertexts", "model_version"}:
+        raise ProtocolError(
+            "score request must be {n, ciphertexts, model_version[, encoding]}"
+        )
+    encoding = body.get("encoding", "dec")
+    if encoding not in WIRE_ENCODINGS:
+        raise ProtocolError(f"encoding must be one of {WIRE_ENCODINGS}")
     n = body["n"]
     if not isinstance(n, str) or not n.isdecimal():
         raise ProtocolError("n must be a decimal string")
+    ciphertexts = body["ciphertexts"]
+    if not isinstance(ciphertexts, list) or not ciphertexts:
+        raise ProtocolError("ciphertexts must be a non-empty list")
+    width = ciphertext_width(int(n))
+    parsed = [decode_ciphertext(ct, encoding, width) for ct in ciphertexts]
     version = body["model_version"]
     if not isinstance(version, str) or not version:
         raise ProtocolError("model_version must be a non-empty string")
     return n, parsed, version
+
+
+def ciphertext_width(n: int) -> int:
+    """Bytes of one ciphertext below n² (b64 form is always this wide)."""
+    return max(1, ((n * n).bit_length() + 7) // 8)
+
+
+def encode_ciphertext(ciphertext: int, encoding: str, width: int) -> str:
+    if encoding == "dec":
+        return str(ciphertext)
+    return base64.b64encode(ciphertext.to_bytes(width, "big")).decode("ascii")
+
+
+def decode_ciphertext(text, encoding: str, width: int) -> int:
+    if isinstance(text, bool) or not isinstance(text, str):
+        raise ProtocolError("each ciphertext must be a string")
+    if encoding == "dec":
+        if not text.isdecimal():
+            raise ProtocolError("each ciphertext must be a decimal string")
+        return int(text)
+    try:
+        raw = base64.b64decode(text, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise ProtocolError("each ciphertext must be base64") from exc
+    if len(raw) != width:
+        raise ProtocolError(f"each b64 ciphertext must be {width} bytes")
+    return int.from_bytes(raw, "big")
 
 
 def score_response(result: str, exponent: int) -> dict:

@@ -31,7 +31,7 @@ def test_public_model_message_drops_weights():
 
 def test_score_request_round_trip_and_rejects_secrets():
     body = protocol.score_request("17", ["4", "9"], "1")
-    assert protocol.parse_score_request(body) == ("17", ["4", "9"], "1")
+    assert protocol.parse_score_request(body) == ("17", [4, 9], "1")
     leaked = {**body, "p": "11"}
     with pytest.raises(ValueError, match="private-key"):
         protocol.parse_score_request(leaked)
@@ -39,6 +39,22 @@ def test_score_request_round_trip_and_rejects_secrets():
         protocol.parse_score_request({**body, "ciphertexts": ["-1"]})
     with pytest.raises(protocol.ProtocolError):
         protocol.parse_score_request({**body, "ciphertexts": [4]})
+
+
+def test_b64_request_round_trip_and_fixed_width():
+    n = 2**61 - 1
+    cts = [0, 5, n * n - 1]
+    body = protocol.score_request(str(n), cts, "1", encoding="b64")
+    assert body["encoding"] == "b64"
+    assert len({len(ct) for ct in body["ciphertexts"]}) == 1
+    assert protocol.parse_score_request(body) == (str(n), cts, "1")
+    assert "encoding" not in protocol.score_request(str(n), cts, "1")
+    with pytest.raises(protocol.ProtocolError, match="base64"):
+        protocol.parse_score_request({**body, "ciphertexts": ["not base64!"]})
+    with pytest.raises(protocol.ProtocolError, match="bytes"):
+        protocol.parse_score_request({**body, "ciphertexts": ["AAAA"]})
+    with pytest.raises(protocol.ProtocolError, match="encoding"):
+        protocol.parse_score_request({**body, "encoding": "hex"})
 
 
 def test_score_response_keeps_exponent_zero():

@@ -79,6 +79,28 @@ def test_score_round_trip(client, tiny_artifacts):
     )
 
 
+def test_score_accepts_b64_ciphertexts(client):
+    public_key, private_key = crypto.generate_keypair(1024)
+    encrypted = crypto.encrypt_vector(public_key, [5, 1, 9])
+    body = protocol.score_request(
+        str(public_key.n),
+        [c.ciphertext() for c in encrypted],
+        "t",
+        encoding="b64",
+    )
+    decimal = protocol.score_request(
+        str(public_key.n), [c.ciphertext() for c in encrypted], "t"
+    )
+    assert len(json.dumps(body)) < len(json.dumps(decimal))
+    response = client.post("/score", json=body)
+    assert response.status_code == 200
+    payload = response.json()
+    got = crypto.decrypt_scalar(
+        private_key, crypto.ciphertext_from_pair(public_key, (payload["result"], 0))
+    )
+    assert got == 4 + 5 * 2 + 1 * (-3)
+
+
 def test_score_response_is_freshly_obfuscated(tiny_artifacts):
     weights_path, _, _ = tiny_artifacts
     server = Server(weights_path=weights_path)
