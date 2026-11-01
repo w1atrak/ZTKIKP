@@ -5,12 +5,13 @@ from __future__ import annotations
 import json
 import logging
 import time
+from concurrent.futures import Executor
 from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from phe.paillier import EncryptedNumber
+from phe.paillier import EncryptedNumber, PaillierPublicKey
 
 from ppspam import config, crypto, features, protocol, quantize
 
@@ -40,15 +41,37 @@ class Server:
             weights.get("model_version", model_version or config.MODEL_VERSION)
         )
 
-    def score(self, public_key, enc_vector) -> EncryptedNumber:
-        """``Enc(b_q') + Σ enc_i * w_q[i]``. A zero weight skips the multiplication."""
+    def score(
+        self,
+        public_key,
+        enc_vector,
+        executor: Executor | None = None,
+        chunks: int = 1,
+    ) -> EncryptedNumber:
+        """``Enc(b_q') + Σ enc_i * w_q[i]``. A zero weight skips the multiplication.
+
+        With ``executor`` the sum is split into ``chunks`` partial sums computed
+        in workers; addition mod n² is order-free, so the result is the same.
+        """
         self._validate(public_key, enc_vector)
         # Unobfuscated on purpose: ciphertext_to_pair obfuscates the final sum.
         acc = public_key.encrypt(self.b_q_prime, r_value=1)
-        for cipher, weight in zip(enc_vector, self.w_q, strict=True):
-            if weight == 0:
-                continue
-            acc = acc + cipher * int(weight)
+        terms = [
+            (cipher, int(weight))
+            for cipher, weight in zip(enc_vector, self.w_q, strict=True)
+            if weight != 0
+        ]
+        if executor is None:
+            for cipher, weight in terms:
+                acc = acc + cipher * weight
+            return acc
+        raw = [(cipher.ciphertext(be_secure=False), weight) for cipher, weight in terms]
+        futures = [
+            executor.submit(_partial_score, public_key.n, part)
+            for part in crypto.split_chunks(raw, chunks)
+        ]
+        for future in futures:
+            acc = acc + EncryptedNumber(public_key, future.result(), 0)
         return acc
 
     def score_request(self, payload: dict) -> EncryptedNumber:
@@ -101,6 +124,15 @@ class Server:
             raw = item.ciphertext(be_secure=False)
             if not 0 <= raw < public_key.nsquare:
                 raise ValueError("ciphertext is outside 0 .. n²-1")
+
+
+def _partial_score(n: int, terms: list[tuple[int, int]]) -> int:
+    """Raw ciphertext of ``Σ ct_i * w_i`` for one chunk (worker process)."""
+    public_key = PaillierPublicKey(n=n)
+    acc = public_key.encrypt(0, r_value=1)
+    for ciphertext, weight in terms:
+        acc = acc + EncryptedNumber(public_key, ciphertext, 0) * weight
+    return acc.ciphertext(be_secure=False)
 
 
 def create_app(

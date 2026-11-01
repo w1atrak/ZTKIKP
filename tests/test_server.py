@@ -2,6 +2,7 @@
 
 import ast
 import random
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -38,6 +39,25 @@ def test_score_matches_integer_dot_product():
     encrypted = crypto.encrypt_vector(public_key, x_q)
     got = crypto.decrypt_scalar(private_key, server.score(public_key, encrypted))
     assert got == quantize.quantized_score([x_q], w_q, b_q)[0]
+
+
+def test_parallel_score_matches_serial():
+    rng = random.Random(1)
+    d = 40
+    x_q = [rng.randint(0, 900) for _ in range(d)]
+    w_q = [rng.randint(-600, 600) for _ in range(d)]
+    w_q[0] = w_q[7] = 0
+    b_q = -12345
+    public_key, private_key = crypto.generate_keypair(1024)
+    server = Server(weights={"w_q": w_q, "b_q_prime": b_q, "d": d})
+    encrypted = crypto.encrypt_vector(public_key, x_q)
+    expected = quantize.quantized_score([x_q], w_q, b_q)[0]
+    with ProcessPoolExecutor(max_workers=2) as executor:
+        for chunks in (1, 3, 64):
+            result = server.score(
+                public_key, encrypted, executor=executor, chunks=chunks
+            )
+            assert crypto.decrypt_scalar(private_key, result) == expected
 
 
 def test_score_request_round_trip():
