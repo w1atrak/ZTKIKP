@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import Sequence
+from concurrent.futures import Executor
 from pathlib import Path
 
 import httpx
@@ -32,7 +33,12 @@ class Client:
         model_version: str | None = None,
         base_url: str | None = None,
         timeout: float = 300.0,
+        encoding: str = "dec",
+        executor: Executor | None = None,
+        chunks: int = 1,
     ):
+        if encoding not in protocol.WIRE_ENCODINGS:
+            raise ValueError(f"encoding must be one of {protocol.WIRE_ENCODINGS}")
         if keypair is None:
             self.public_key, self.private_key = crypto.generate_keypair(n_length)
         else:
@@ -62,6 +68,11 @@ class Client:
         )
         self.base_url = None if base_url is None else base_url.rstrip("/")
         self.timeout = timeout
+        self.encoding = encoding
+        self.executor = executor
+        self.chunks = chunks
+        self.pool = crypto.ObfuscatorPool(self.public_key)
+        self.encrypt_mode: str | None = None
         self.timings: dict[str, float] = {}
         self.timing_log: list[dict[str, float]] = []
 
@@ -72,8 +83,12 @@ class Client:
         n_length: int = config.KEY_SIZE_DEV,
         keypair=None,
         timeout: float = 300.0,
+        **options,
     ) -> Client:
-        """Fetch ``GET /public-model`` and build a networked client."""
+        """Fetch ``GET /public-model`` and build a networked client.
+
+        ``options`` go to ``__init__`` (``encoding``, ``executor``, ``chunks``).
+        """
         url = base_url.rstrip("/")
         with httpx.Client(timeout=timeout) as http:
             response = http.get(f"{url}/public-model")
@@ -86,7 +101,26 @@ class Client:
             keypair=keypair,
             base_url=url,
             timeout=timeout,
+            **options,
         )
+
+    def precompute(self, messages: int = 1) -> float:
+        """Fill the obfuscator pool for ``messages`` SMS offline; returns seconds."""
+        started = time.perf_counter()
+        self.pool.fill(
+            messages * self.featurizer.d, executor=self.executor, chunks=self.chunks
+        )
+        return time.perf_counter() - started
+
+    def _encrypt(self, x_q: list[int]) -> tuple[list, str]:
+        if len(self.pool) >= len(x_q):
+            return crypto.encrypt_vector(self.public_key, x_q, pool=self.pool), "pool"
+        if self.executor is not None:
+            encrypted = crypto.encrypt_vector_parallel(
+                self.public_key, x_q, self.executor, self.chunks
+            )
+            return encrypted, "parallel"
+        return crypto.encrypt_vector(self.public_key, x_q), "serial"
 
     def prepare(self, text: str) -> dict:
         """Dense encrypted vector of length ``d``, plus the public key (in-process)."""
@@ -99,7 +133,7 @@ class Client:
             raise ValueError(
                 f"quantized vector has length {len(x_q)}, expected {self.featurizer.d}"
             )
-        encrypted = crypto.encrypt_vector(self.public_key, x_q)
+        encrypted, mode = self._encrypt(x_q)
         encrypted_at = time.perf_counter()
         payload = {
             "public_key": crypto.dump_public_key(self.public_key),
@@ -115,16 +149,18 @@ class Client:
             "serialize_s": serialized - encrypted_at,
         }
         self.timings = timings
+        self.encrypt_mode = mode
         self.timing_log.append(timings)
         return payload
 
     def score_body(self, text: str) -> dict:
-        """Wire-format ``POST /score`` body for ``text``."""
+        """Wire-format ``POST /score`` body for ``text`` in ``self.encoding``."""
         payload = self.prepare(text)
         return protocol.score_request(
             payload["public_key"]["n"],
             [pair[0] for pair in payload["ciphertexts"]],
             self.model_version,
+            encoding=self.encoding,
         )
 
     def decide(self, encrypted_result) -> tuple[int, int]:

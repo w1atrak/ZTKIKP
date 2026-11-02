@@ -1,12 +1,13 @@
 """Client prepare/decide against a plaintext stub server (phase B3/B5)."""
 
 import json
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 import numpy as np
 from fastapi.testclient import TestClient
 
-from ppspam import crypto, features, model, quantize
+from ppspam import crypto, features, model, protocol, quantize
 from ppspam.client import Client
 from ppspam.server import create_app
 
@@ -58,6 +59,44 @@ def test_prepare_is_dense_and_stub_score_round_trips():
         assert "decrypt_s" in client.timings
 
     assert len(client.timing_log) == 3
+
+
+def test_encrypt_modes_decrypt_to_the_same_vector():
+    public = _public_model()
+    d = public["d"]
+    text = "free prize"
+    with ProcessPoolExecutor(max_workers=2) as executor:
+        client = Client(public_model=public, n_length=1024, executor=executor, chunks=2)
+        expected = quantize.quantize_features(
+            client.featurizer.transform([text]), client.scale_x
+        )[0]
+        seen = {}
+        for mode in ("parallel", "pool"):
+            if mode == "pool":
+                client.precompute(messages=1)
+                assert len(client.pool) == d
+            payload = client.prepare(text)
+            seen[client.encrypt_mode] = [
+                crypto.decrypt_scalar(
+                    client.private_key,
+                    crypto.ciphertext_from_pair(client.public_key, pair),
+                )
+                for pair in payload["ciphertexts"]
+            ]
+    assert len(client.pool) == 0
+    assert seen == {"parallel": expected, "pool": expected}
+    serial = Client(public_model=public, n_length=1024)
+    serial.prepare(text)
+    assert serial.encrypt_mode == "serial"
+
+
+def test_score_body_b64_encoding():
+    client = Client(public_model=_public_model(), n_length=1024, encoding="b64")
+    body = client.score_body("free prize")
+    assert body["encoding"] == "b64"
+    n, cts, _ = protocol.parse_score_request(body)
+    assert int(n) == client.public_key.n
+    assert len(cts) == client.featurizer.d
 
 
 def test_score_body_and_http_round_trip(tmp_path: Path, monkeypatch):
