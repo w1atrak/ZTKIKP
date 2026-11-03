@@ -224,7 +224,9 @@ def create_app(
             version,
             elapsed_ms,
         )
-        return response
+        return JSONResponse(
+            response, headers={"Server-Timing": f"score;dur={elapsed_ms:.3f}"}
+        )
 
     return app
 

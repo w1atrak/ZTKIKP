@@ -187,7 +187,15 @@ class Client:
         started = time.perf_counter()
         with httpx.Client(timeout=self.timeout) as http:
             response = http.post(f"{url}/score", json=body)
-        self.timings = {**self.timings, "transfer_s": time.perf_counter() - started}
+        round_trip = time.perf_counter() - started
+        self.timings = {**self.timings, "transfer_s": round_trip}
+        server_s = _server_timing_s(response.headers)
+        if server_s is not None:
+            self.timings = {
+                **self.timings,
+                "server_s": server_s,
+                "transfer_s": max(0.0, round_trip - server_s),
+            }
         if response.status_code >= 400:
             raise httpx.HTTPStatusError(
                 f"score failed: {response.status_code} {response.text}",
@@ -197,6 +205,25 @@ class Client:
         label, score = self.decide_response(response.json())
         self.timing_log[-1] = {**self.timing_log[-1], **self.timings}
         return label, score
+
+
+def _server_timing_s(headers) -> float | None:
+    """Seconds from ``Server-Timing: score;dur=<ms>``, if the server sent it."""
+    header = (headers or {}).get("server-timing")
+    if not header:
+        return None
+    for metric in header.split(","):
+        name, *params = (part.strip() for part in metric.split(";"))
+        if name != "score":
+            continue
+        for param in params:
+            key, _, value = param.partition("=")
+            if key == "dur":
+                try:
+                    return float(value) / 1000
+                except ValueError:
+                    return None
+    return None
 
 
 def _as_encrypted(public_key, encrypted_result):

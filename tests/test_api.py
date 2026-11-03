@@ -66,6 +66,7 @@ def test_score_round_trip(client, tiny_artifacts):
     )
     response = client.post("/score", json=body)
     assert response.status_code == 200
+    assert response.headers["server-timing"].startswith("score;dur=")
     payload = response.json()
     assert payload["exponent"] == 0
     got = crypto.decrypt_scalar(

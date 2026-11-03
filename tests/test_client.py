@@ -120,8 +120,9 @@ def test_score_body_and_http_round_trip(tmp_path: Path, monkeypatch):
     assert len(body["ciphertexts"]) == d
 
     class _FakeResponse:
-        def __init__(self, payload):
+        def __init__(self, payload, headers):
             self.status_code = 200
+            self.headers = headers
             self._payload = payload
             self.text = json.dumps(payload)
             self.request = None
@@ -141,7 +142,8 @@ def test_score_body_and_http_round_trip(tmp_path: Path, monkeypatch):
 
         def post(self, url, json):  # noqa: A002
             assert url.endswith("/score")
-            return _FakeResponse(api.post("/score", json=json).json())
+            real = api.post("/score", json=json)
+            return _FakeResponse(real.json(), real.headers)
 
     monkeypatch.setattr("ppspam.client.httpx.Client", _FakeHttp)
     label, score = client.score_remote("hello there")
@@ -152,3 +154,4 @@ def test_score_body_and_http_round_trip(tmp_path: Path, monkeypatch):
     assert score == expected
     assert label == int(model.predict_linear(np.asarray([expected], dtype=np.float64))[0])
     assert "transfer_s" in client.timings
+    assert client.timings["server_s"] > 0
