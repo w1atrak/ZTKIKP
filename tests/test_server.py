@@ -58,6 +58,13 @@ def test_parallel_score_matches_serial():
                 public_key, encrypted, executor=executor, chunks=chunks
             )
             assert crypto.decrypt_scalar(private_key, result) == expected
+        pooled = Server(
+            weights={"w_q": w_q, "b_q_prime": b_q, "d": d},
+            executor=executor,
+            chunks=4,
+        )
+        result = pooled.score(public_key, encrypted)
+        assert crypto.decrypt_scalar(private_key, result) == expected
 
 
 def test_score_request_round_trip():

@@ -26,7 +26,10 @@ class Server:
         weights: dict | None = None,
         weights_path: Path | None = None,
         model_version: str | None = None,
+        executor: Executor | None = None,
+        chunks: int = 1,
     ):
+        """``executor``/``chunks`` are the default for :meth:`score` (B6)."""
         if weights is None:
             path = (
                 quantize.SERVER_WEIGHTS_Q_JSON if weights_path is None else weights_path
@@ -40,13 +43,15 @@ class Server:
         self.model_version = str(
             weights.get("model_version", model_version or config.MODEL_VERSION)
         )
+        self.executor = executor
+        self.chunks = chunks
 
     def score(
         self,
         public_key,
         enc_vector,
         executor: Executor | None = None,
-        chunks: int = 1,
+        chunks: int | None = None,
     ) -> EncryptedNumber:
         """``Enc(b_q') + Σ enc_i * w_q[i]``. A zero weight skips the multiplication.
 
@@ -61,6 +66,8 @@ class Server:
             for cipher, weight in zip(enc_vector, self.w_q, strict=True)
             if weight != 0
         ]
+        executor = self.executor if executor is None else executor
+        chunks = self.chunks if chunks is None else chunks
         if executor is None:
             for cipher, weight in terms:
                 acc = acc + cipher * weight
@@ -139,9 +146,16 @@ def create_app(
     weights_path: Path | None = None,
     public_model_path: Path | None = None,
     model_version: str | None = None,
+    executor: Executor | None = None,
+    chunks: int = 1,
 ) -> FastAPI:
     """FastAPI app: ``GET /public-model``, ``POST /score``. No private key."""
-    server = Server(weights_path=weights_path, model_version=model_version)
+    server = Server(
+        weights_path=weights_path,
+        model_version=model_version,
+        executor=executor,
+        chunks=chunks,
+    )
     public_path = (
         features.PUBLIC_MODEL_JSON if public_model_path is None else public_model_path
     )
@@ -231,19 +245,37 @@ def create_app(
     return app
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
+    import argparse
+    from concurrent.futures import ProcessPoolExecutor
+
     import uvicorn
+
+    parser = argparse.ArgumentParser(description="ppspam scoring server")
+    parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="processes for the homomorphic sum (1 = serial)",
+    )
+    args = parser.parse_args(argv)
 
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
-    uvicorn.run(
-        create_app(),
-        host="127.0.0.1",
-        port=8000,
-        log_level="info",
-    )
+    executor = ProcessPoolExecutor(args.workers) if args.workers > 1 else None
+    try:
+        uvicorn.run(
+            create_app(executor=executor, chunks=args.workers),
+            host="127.0.0.1",
+            port=args.port,
+            log_level="info",
+        )
+    finally:
+        if executor is not None:
+            executor.shutdown()
 
 
 if __name__ == "__main__":

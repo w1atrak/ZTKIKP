@@ -54,7 +54,7 @@ bench:
 	@echo "Not implemented yet — see scripts/bench.py"
 
 serve:
-	$(PY) -m ppspam.server
+	$(PY) -m ppspam.server $(ARGS)
 
 demo:
 	$(PY) scripts/demo.py $(ARGS)
