@@ -51,7 +51,7 @@ budget:
 	$(PY) scripts/budget.py
 
 bench:
-	@echo "Not implemented yet — see scripts/bench.py"
+	$(PY) scripts/bench.py $(ARGS)
 
 serve:
 	$(PY) -m ppspam.server $(ARGS)
