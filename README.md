@@ -72,3 +72,14 @@ make eval-encrypted ARGS='--limit 10 --key-size 1024'   # szybki smoke
 
 Wyniki: `results/encrypted_eval.csv`, `results/encrypted_metrics.json` (K2–K4).
 
+## Optymalizacje i pomiary (B6, W2)
+
+```bash
+make bench                              # E2–E7, 10 powtórzeń, ~20 min
+make bench ARGS='--only E6,E7'          # wybrane eksperymenty
+make bench ARGS='--quick --repeats 2'   # smoke, nie do raportu
+make serve ARGS='--workers 6'           # API z równoległym iloczynem na serwerze
+```
+
+Wyniki: `results/bench.md` (tabele + wykresy), `results/bench_e*.csv`, `results/bench_env.json`. Przy `d=1000` i kluczu 2048 jeden SMS end-to-end to ok. 8,2 s w wersji bazowej, ok. 1,85 s z równoległym szyfrowaniem i serwerem oraz ok. 88 ms online z prekomputowaną pulą `r^n`. Wersja jawna to ok. 0,36 ms.
+
