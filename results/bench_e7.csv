@@ -1,0 +1,18 @@
+optimization,variant,unit,median,q1,q3,n_repeats,note
+gmpy2: szyfrowanie klienta,przed (czysty Python),s,82.44251185499706,82.04271752000068,82.75937655749885,10,"zmierzone na 100 współrzędnych, przeskalowane ×10"
+gmpy2: szyfrowanie klienta,po (gmpy2),s,7.930697009996948,7.909930207499656,7.980394902494936,10,"zmierzone na 100 współrzędnych, przeskalowane ×10"
+gmpy2: serwer,przed (czysty Python),s,2.0022184140002537,1.9955906572504318,2.008372743500331,10,
+gmpy2: serwer,po (gmpy2),s,0.08684192550026637,0.0863596137503464,0.08947172149987637,10,
+równoległe szyfrowanie klienta,przed (1 proces),s,7.903314587500063,7.884276513999794,7.947266806250127,10,
+równoległe szyfrowanie klienta,po (6 procesów),s,1.7409501185002227,1.720313739249832,1.7579779685001995,10,
+prekomputacja r^n (online),przed (r^n w trakcie),s,7.903314587500063,7.884276513999794,7.947266806250127,10,
+prekomputacja r^n (online),po (pula offline),s,0.009324375999767653,0.008791103749899776,0.009488074000273627,10,r^n liczone wcześniej (koszt offline w wierszu niżej)
+"prekomputacja r^n (offline, informacyjnie)","napełnienie puli, 6 procesów",s,1.8398419415002536,1.8249413337500755,1.855031867000207,10,
+równoległy serwer,przed (1 proces),s,0.08684192550026637,0.0863596137503464,0.08947172149987637,10,
+równoległy serwer,po (6 procesów),s,0.02569844449953962,0.024276865500041822,0.026563479499827736,10,
+bias bez obfuskacji,przed (Enc(b) z r^n),s,0.008596258500347176,0.008335891999649903,0.008755823749652336,10,
+bias bez obfuskacji,po (Enc(b) z r=1),s,1.1892499969690107e-05,1.1389249948479119e-05,1.2538250075522228e-05,10,oszczędza jedno r^n na żądanie (wynik i tak jest obfuskowany)
+mniejsza skala S_w,przed (S_w=1e6),s,0.15290180350029914,0.15142530274965793,0.15533754649982257,10,
+mniejsza skala S_w,po (S_w=100),s,0.08684192550026637,0.0863596137503464,0.08947172149987637,10,
+kompaktowa serializacja,przed (JSON dziesiętny),B,1236480.0,1236480.0,1236480.0,1,
+kompaktowa serializacja,po (JSON base64),B,687678.0,687678.0,687678.0,1,

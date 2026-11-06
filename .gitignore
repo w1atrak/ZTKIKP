@@ -28,6 +28,9 @@ results/*.json
 !results/bench_primitives.csv
 !results/encrypted_eval.csv
 !results/encrypted_metrics.json
+!results/bench_*.csv
+!results/bench_*.png
+!results/bench_env.json
 !results/.gitkeep
 
 # IDE

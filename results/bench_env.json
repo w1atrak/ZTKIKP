@@ -1,0 +1,18 @@
+{
+  "timestamp": "2026-11-03T19:24:44+00:00",
+  "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+  "kernel": "6.6.87.2-microsoft-standard-WSL2",
+  "wsl2": true,
+  "cpu": "AMD Ryzen 5 4500U with Radeon Graphics",
+  "logical_cpus": 6,
+  "ram_gib": 7.45,
+  "python": "3.14.4",
+  "phe": "1.5.0",
+  "gmpy2": "2.3.2",
+  "numpy": "2.5.4",
+  "repeats": 10,
+  "workers": 6,
+  "d": 1000,
+  "S_x": 1000.0,
+  "S_w": 100.0
+}
