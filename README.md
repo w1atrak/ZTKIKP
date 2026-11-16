@@ -45,8 +45,7 @@ Dane: `data/raw/` (pobierane skryptem), `data/processed/` (train/test).
 Artefakty modelu: `artifacts/`, wyniki pomiarów: `results/`.
 
 ## Demo klient–serwer (B5)
-
-Najpierw `make train` (artefakty w `artifacts/`). Potem lokalnie w jednym procesie:
+Najpierw przygotuj dane, model i kwantyzację (`make data && make train && make quantize` — artefakty trafią do `artifacts/`). Potem lokalnie w jednym procesie:
 
 ```bash
 make demo
